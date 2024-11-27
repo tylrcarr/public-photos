@@ -39,11 +39,9 @@ itemnumber=$(ls -1q $workingdir | wc -l)
 newfilename=$itemnumber.${1#*.}
 
 mv "$1" "$workingdir/$newfilename"
-updated_json=$(jq --arg year "$year" --arg month "$month" --arg day "$day" --arg file "$newfilename" '
-    if .[$year] == null then .[$year] = {} else . end |
-    if .[$year][$month] == null then .[$year][$month] = {} else . end |
-    if .[$year][$month][$day] == null then .[$year][$month][$day] = [] else . end |
-    .[$year][$month][$day] += [$file]
+updated_json=$(jq --arg date "$workingdir" --arg file "$newfilename" '
+    if .[$date] == null then .[$date] = [] else . end |
+    .[$date] += [$file]
 ' "ledger.json")
 
 echo "$updated_json" > "ledger.json"
