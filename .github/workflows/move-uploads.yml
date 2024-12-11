@@ -1,7 +1,11 @@
 name: Process Uploaded Photos
 
 on:
-  workflow_dispatch: # Manually trigger the workflow
+  workflow_dispatch:
+    inputs:
+      description:
+        description: "Photo description"
+        required: true
 
 jobs:
   process_photos:
@@ -16,7 +20,7 @@ jobs:
       - name: Install jq
         run: sudo apt-get install jq -y
 
-      # Step 3: Move and process files in uploads folder
+      # Step 3: Process uploads folder
       - name: Process uploads folder
         run: |
           # Directory containing uploaded files
@@ -55,7 +59,7 @@ jobs:
                   mv "$FILE" "$WORKING_DIR/$NEW_FILENAME"
 
                   # Update ledger.json
-                  DESCRIPTION="Auto-generated description for file $NEW_FILENAME"
+                  DESCRIPTION="${{ github.event.inputs.description }}"
                   UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
                       if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
                       .[$date].files += [$file] |
