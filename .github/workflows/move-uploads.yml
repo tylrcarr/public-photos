@@ -57,9 +57,12 @@ jobs:
           fi
 
           # Create target directory
+          echo "Creating target directory: $WORKING_DIR"
           mkdir -p "$WORKING_DIR" || { echo "Failed to create $WORKING_DIR"; exit 1; }
-          echo "Target working directory: $WORKING_DIR"
-          ls -la "$WORKING_DIR"
+
+          # Confirm directory was created
+          echo "Directory contents after creation:"
+          ls -la "$WORKING_DIR" || { echo "Failed to access $WORKING_DIR"; exit 1; }
 
           # Ensure ledger.json exists
           if [ ! -f "ledger.json" ]; then
@@ -101,7 +104,26 @@ jobs:
 
               # Debugging: File renaming and moving
               echo "Attempting to move $FILE to $WORKING_DIR/$NEW_FILENAME"
-              mv "$FILE" "$WORKING_DIR/$NEW_FILENAME" || { echo "Failed to move $FILE"; exit 1; }
+
+              # Test write permissions on the target directory
+              echo "Testing write permissions for $WORKING_DIR"
+              touch "$WORKING_DIR/test_write" || { echo "Cannot write to $WORKING_DIR"; exit 1; }
+              rm "$WORKING_DIR/test_write"
+
+              # Confirm no conflicting file exists
+              if [ -f "$WORKING_DIR/$NEW_FILENAME" ]; then
+                  echo "Conflict: File already exists at $WORKING_DIR/$NEW_FILENAME"
+                  exit 1
+              fi
+
+              # Move the file (no debug option for `mv`, so wrap it in debug logs)
+              mv "$FILE" "$WORKING_DIR/$NEW_FILENAME" || { 
+                  echo "Failed to move $FILE to $WORKING_DIR/$NEW_FILENAME"; 
+                  ls -la "$WORKING_DIR"; 
+                  exit 1; 
+              }
+
+              echo "Successfully moved $FILE to $WORKING_DIR/$NEW_FILENAME"
 
               # Update ledger.json
               echo "Updating ledger.json with file $NEW_FILENAME"
