@@ -1,20 +1,8 @@
-name: Add Photo
+name: Add Photo with Upload
 
 on:
   workflow_dispatch:
     inputs:
-      file_path:
-        description: "Path to the photo file"
-        required: true
-      year:
-        description: "Year (default: current year)"
-        required: false
-      month:
-        description: "Month (default: current month)"
-        required: false
-      day:
-        description: "Day (default: current day)"
-        required: false
       description:
         description: "Photo description"
         required: false
@@ -28,65 +16,51 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Setup jq (used for JSON manipulation)
+      # Step 2: Download the uploaded photo
+      - name: Download photo artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: photo-file
+
+      # Step 3: Install jq (used for JSON manipulation)
       - name: Install jq
         run: sudo apt-get install jq -y
 
-      # Step 3: Run the script logic
-      - name: Add photo to ledger
-        env:
-          CURRENT_YEAR: ${{ github.event.inputs.year || env.DEFAULT_YEAR }}
-          CURRENT_MONTH: ${{ github.event.inputs.month || env.DEFAULT_MONTH }}
-          CURRENT_DAY: ${{ github.event.inputs.day || env.DEFAULT_DAY }}
-          DESCRIPTION: ${{ github.event.inputs.description || 'Default description' }}
+      # Step 4: Process the uploaded photo
+      - name: Process uploaded photo
         run: |
-          # Get the current date if inputs are not provided
-          DEFAULT_YEAR=$(date +%Y)
-          DEFAULT_MONTH=$(date +%m)
-          DEFAULT_DAY=$(date +%d)
-
-          # Set variables from inputs or defaults
-          YEAR=${{ github.event.inputs.year || $DEFAULT_YEAR }}
-          MONTH=${{ github.event.inputs.month || $DEFAULT_MONTH }}
-          DAY=${{ github.event.inputs.day || $DEFAULT_DAY }}
-          FILE_PATH="${{ github.event.inputs.file_path }}"
-          DESCRIPTION="${{ github.event.inputs.description || 'Default description' }}"
-
-          # Validate file existence
-          if [ ! -f "$FILE_PATH" ]; then
-              echo "Error: File does not exist."
+          PHOTO_PATH="./photo-file"
+          if [ ! -f "$PHOTO_PATH" ]; then
+              echo "Photo file not found."
               exit 1
           fi
 
-          # Set working directory
+          # Set up the working directory based on current date
+          YEAR=$(date +%Y)
+          MONTH=$(date +%m)
+          DAY=$(date +%d)
           WORKING_DIR="$YEAR/$MONTH/$DAY"
           mkdir -p "$WORKING_DIR"
 
-          # Determine the new filename
+          # Generate the new filename
           ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
           ((ITEM_NUMBER++))
-          FILE_EXTENSION="${FILE_PATH##*.}"
+          FILE_EXTENSION="${PHOTO_PATH##*.}"
           NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
 
-          # Move the file
-          mv "$FILE_PATH" "$WORKING_DIR/$NEW_FILENAME"
+          # Move the photo
+          mv "$PHOTO_PATH" "$WORKING_DIR/$NEW_FILENAME"
 
           # Ensure ledger.json exists
           if [ ! -f "ledger.json" ]; then
               echo "{}" > ledger.json
           fi
 
-          # Retrieve existing text for the date, if any
-          EXISTING_TEXT=$(jq -r --arg date "$WORKING_DIR" '.[$date].text // empty' ledger.json)
-
-          if [ -z "$EXISTING_TEXT" ]; then
-              TEXT="$DESCRIPTION"
-          else
-              TEXT="$EXISTING_TEXT"
-          fi
+          # Get the description input
+          DESCRIPTION="${{ github.event.inputs.description || 'Default description' }}"
 
           # Update ledger.json
-          UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$TEXT" '
+          UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
               if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
               .[$date].files += [$file] |
               .[$date].text = .[$date].text // $text
@@ -96,7 +70,7 @@ jobs:
 
           echo "File moved to $WORKING_DIR/$NEW_FILENAME and ledger updated."
 
-      # Step 4: Commit changes
+      # Step 5: Commit changes
       - name: Commit and push changes
         run: |
           git config user.name "GitHub Actions"
