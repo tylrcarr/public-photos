@@ -20,6 +20,9 @@ jobs:
 
       - name: Process uploads
         run: |
+          # Enable error handling
+          set -e
+
           # Current date as fallback
           CURRENT_YEAR=$(date +%Y)
           CURRENT_MONTH=$(date +%m)
@@ -52,7 +55,7 @@ jobs:
           fi
 
           # Create target directory
-          mkdir -p "$WORKING_DIR"
+          mkdir -p "$WORKING_DIR" || { echo "Failed to create $WORKING_DIR"; exit 1; }
           echo "Target working directory: $WORKING_DIR"
           ls -la "$WORKING_DIR"
 
@@ -74,27 +77,33 @@ jobs:
           # Process each file
           for FILE in "$UPLOADS_DIR"/*; do
               echo "Processing file: $FILE"
+
+              # Check if it's a valid file
               if [ ! -f "$FILE" ]; then
                   echo "$FILE is not a valid file. Skipping."
                   continue
               fi
 
+              # Determine new file name
               ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
               ((ITEM_NUMBER++))
               FILE_EXTENSION="${FILE##*.}"
               NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
 
-              echo "Moving file to: $WORKING_DIR/$NEW_FILENAME"
-              mv "$FILE" "$WORKING_DIR/$NEW_FILENAME"
+              # Debugging: File renaming and moving
+              echo "Attempting to move $FILE to $WORKING_DIR/$NEW_FILENAME"
+              mv "$FILE" "$WORKING_DIR/$NEW_FILENAME" || { echo "Failed to move $FILE"; exit 1; }
 
+              # Update ledger.json
+              echo "Updating ledger.json with file $NEW_FILENAME"
               UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
                   if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
                   .[$date].files += [$file] |
                   .[$date].text = .[$date].text // $text
-              ' ledger.json)
+              ' ledger.json) || { echo "jq command failed"; exit 1; }
 
-              echo "$UPDATED_JSON" > ledger.json
-              echo "File $FILE processed and added to ledger."
+              echo "$UPDATED_JSON" > ledger.json || { echo "Failed to write to ledger.json"; exit 1; }
+              echo "File $FILE processed successfully and added to ledger.json."
           done
 
           # Debugging: Check ledger.json after processing
