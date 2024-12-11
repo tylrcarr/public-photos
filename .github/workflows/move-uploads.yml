@@ -15,12 +15,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install jq
-        run: sudo apt-get install jq -y
+      - name: Install jq and file utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install jq -y
+          sudo apt-get install file -y
 
       - name: Process uploads
         run: |
-          # Enable error handling
           set -e
 
           # Current date as fallback
@@ -78,13 +80,26 @@ jobs:
           for FILE in "$UPLOADS_DIR"/*; do
               echo "Processing file: $FILE"
 
-              # Check if it's a valid file
+              # Check if the file is valid
               if [ ! -f "$FILE" ]; then
-                  echo "$FILE is not a valid file. Skipping."
+                  echo "Skipping invalid file: $FILE"
                   continue
               fi
 
-              # Determine new file name
+              # Debugging: File properties
+              echo "File type for $FILE:"
+              file "$FILE" || echo "Failed to determine file type."
+
+              echo "File size for $FILE:"
+              stat --printf="%s bytes\n" "$FILE" || echo "Failed to determine file size."
+
+              # Skip unsupported file types
+              if [[ "$FILE" == *.heic ]]; then
+                  echo "Skipping unsupported file type: $FILE"
+                  continue
+              fi
+
+              # Generate new file name
               ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
               ((ITEM_NUMBER++))
               FILE_EXTENSION="${FILE##*.}"
