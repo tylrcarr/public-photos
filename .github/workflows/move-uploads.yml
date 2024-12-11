@@ -89,12 +89,6 @@ jobs:
                   continue
               fi
 
-              # Debugging: Log the raw and escaped file paths
-              RAW_PATH="$FILE"
-              ESCAPED_PATH=$(printf '%q' "$RAW_PATH")
-              echo "Raw file path: $RAW_PATH"
-              echo "Escaped file path: $ESCAPED_PATH"
-
               # Debugging: File properties
               echo "File type for $FILE:"
               file "$FILE" || echo "Failed to determine file type."
@@ -102,38 +96,19 @@ jobs:
               echo "File size for $FILE:"
               stat --printf="%s bytes\n" "$FILE" || echo "Failed to determine file size."
 
-              # Generate new file name
-              ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
-              ((ITEM_NUMBER++))
-              FILE_EXTENSION="${FILE##*.}"
-              NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
-
-              # Debugging: File renaming and moving
-              echo "Attempting to move $FILE to $WORKING_DIR/$NEW_FILENAME"
-
-              # Test write permissions on the target directory
-              echo "Testing write permissions for $WORKING_DIR"
-              touch "$WORKING_DIR/test_write" || { echo "Cannot write to $WORKING_DIR"; exit 1; }
-              rm "$WORKING_DIR/test_write"
-
-              # Confirm no conflicting file exists
-              if [ -f "$WORKING_DIR/$NEW_FILENAME" ]; then
-                  echo "Conflict: File already exists at $WORKING_DIR/$NEW_FILENAME"
-                  exit 1
-              fi
-
-              # Move the file (no debug option for `mv`, so wrap it in debug logs)
-              mv "$RAW_PATH" "$WORKING_DIR/$NEW_FILENAME" || { 
-                  echo "Failed to move $RAW_PATH to $WORKING_DIR/$NEW_FILENAME"; 
+              # Move the file without renaming
+              echo "Attempting to move $FILE to $WORKING_DIR"
+              mv "$FILE" "$WORKING_DIR/" || { 
+                  echo "Failed to move $FILE to $WORKING_DIR"; 
                   ls -la "$WORKING_DIR"; 
                   exit 1; 
               }
 
-              echo "Successfully moved $FILE to $WORKING_DIR/$NEW_FILENAME"
+              echo "Successfully moved $FILE to $WORKING_DIR"
 
               # Update ledger.json
-              echo "Updating ledger.json with file $NEW_FILENAME"
-              UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
+              echo "Updating ledger.json with file $(basename "$FILE")"
+              UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$(basename "$FILE")" --arg text "$DESCRIPTION" '
                   if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
                   .[$date].files += [$file] |
                   .[$date].text = .[$date].text // $text
