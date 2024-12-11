@@ -89,6 +89,12 @@ jobs:
                   continue
               fi
 
+              # Debugging: Log the raw and escaped file paths
+              RAW_PATH="$FILE"
+              ESCAPED_PATH=$(printf '%q' "$RAW_PATH")
+              echo "Raw file path: $RAW_PATH"
+              echo "Escaped file path: $ESCAPED_PATH"
+
               # Debugging: File properties
               echo "File type for $FILE:"
               file "$FILE" || echo "Failed to determine file type."
@@ -117,8 +123,8 @@ jobs:
               fi
 
               # Move the file (no debug option for `mv`, so wrap it in debug logs)
-              mv "$FILE" "$WORKING_DIR/$NEW_FILENAME" || { 
-                  echo "Failed to move $FILE to $WORKING_DIR/$NEW_FILENAME"; 
+              mv "$RAW_PATH" "$WORKING_DIR/$NEW_FILENAME" || { 
+                  echo "Failed to move $RAW_PATH to $WORKING_DIR/$NEW_FILENAME"; 
                   ls -la "$WORKING_DIR"; 
                   exit 1; 
               }
