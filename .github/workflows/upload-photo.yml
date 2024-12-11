@@ -1,6 +1,0 @@
-- name: Upload Photo
-  uses: actions/upload-artifact@v3
-  with:
-    name: photo-file
-    path: path/to/photo.jpg
-

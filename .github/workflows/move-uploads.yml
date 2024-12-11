@@ -1,0 +1,79 @@
+name: Process Uploaded Photos
+
+on:
+  workflow_dispatch: # Manually trigger the workflow
+
+jobs:
+  process_photos:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Install jq (for JSON manipulation)
+      - name: Install jq
+        run: sudo apt-get install jq -y
+
+      # Step 3: Move and process files in uploads folder
+      - name: Process uploads folder
+        run: |
+          # Directory containing uploaded files
+          UPLOADS_DIR="uploads"
+
+          # Check if uploads directory exists
+          if [ ! -d "$UPLOADS_DIR" ]; then
+              echo "No uploads directory found. Exiting."
+              exit 0
+          fi
+
+          # Get the current date
+          CURRENT_YEAR=$(date +%Y)
+          CURRENT_MONTH=$(date +%m)
+          CURRENT_DAY=$(date +%d)
+          WORKING_DIR="$CURRENT_YEAR/$CURRENT_MONTH/$CURRENT_DAY"
+
+          # Create target directory if it doesn't exist
+          mkdir -p "$WORKING_DIR"
+
+          # Ensure ledger.json exists
+          if [ ! -f "ledger.json" ]; then
+              echo "{}" > ledger.json
+          fi
+
+          # Iterate through all files in the uploads directory
+          for FILE in "$UPLOADS_DIR"/*; do
+              if [ -f "$FILE" ]; then
+                  # Determine new file name
+                  ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
+                  ((ITEM_NUMBER++))
+                  FILE_EXTENSION="${FILE##*.}"
+                  NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
+
+                  # Move the file to the correct directory
+                  mv "$FILE" "$WORKING_DIR/$NEW_FILENAME"
+
+                  # Update ledger.json
+                  DESCRIPTION="Auto-generated description for file $NEW_FILENAME"
+                  UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
+                      if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
+                      .[$date].files += [$file] |
+                      .[$date].text = .[$date].text // $text
+                  ' ledger.json)
+
+                  echo "$UPDATED_JSON" > ledger.json
+
+                  echo "Processed $FILE -> $WORKING_DIR/$NEW_FILENAME"
+              fi
+          done
+
+      # Step 4: Commit changes
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Processed uploads and updated ledger.json"
+          git push
+
