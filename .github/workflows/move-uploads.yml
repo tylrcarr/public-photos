@@ -82,7 +82,7 @@ jobs:
 
               # Check if the file is valid
               if [ ! -f "$FILE" ]; then
-                  echo "Skipping invalid file: $FILE"
+                  echo "$FILE is not a valid file. Skipping."
                   continue
               fi
 
@@ -92,12 +92,6 @@ jobs:
 
               echo "File size for $FILE:"
               stat --printf="%s bytes\n" "$FILE" || echo "Failed to determine file size."
-
-              # Skip unsupported file types
-              if [[ "$FILE" == *.heic ]]; then
-                  echo "Skipping unsupported file type: $FILE"
-                  continue
-              fi
 
               # Generate new file name
               ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
