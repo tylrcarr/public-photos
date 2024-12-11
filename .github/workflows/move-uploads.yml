@@ -12,33 +12,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Install jq (for JSON manipulation)
       - name: Install jq
         run: sudo apt-get install jq -y
 
-      # Step 3: Process uploads folder
-      - name: Process uploads folder
+      - name: Process uploads
         run: |
-          # Directory containing uploaded files
-          UPLOADS_DIR="uploads"
-
-          # Check if uploads directory exists
-          if [ ! -d "$UPLOADS_DIR" ]; then
-              echo "No uploads directory found. Exiting."
-              exit 0
-          fi
-
-          # Get the current date
+          # Current date as fallback
           CURRENT_YEAR=$(date +%Y)
           CURRENT_MONTH=$(date +%m)
           CURRENT_DAY=$(date +%d)
-          WORKING_DIR="$CURRENT_YEAR/$CURRENT_MONTH/$CURRENT_DAY"
 
-          # Create target directory if it doesn't exist
+          YEAR=$CURRENT_YEAR
+          MONTH=$CURRENT_MONTH
+          DAY=$CURRENT_DAY
+          DESCRIPTION="${{ github.event.inputs.description }}"
+          UPLOADS_DIR="uploads"
+          WORKING_DIR="$YEAR/$MONTH/$DAY"
+
+          echo "YEAR: $YEAR, MONTH: $MONTH, DAY: $DAY"
+          echo "Description: $DESCRIPTION"
+
+          # Check if uploads folder exists
+          if [ ! -d "$UPLOADS_DIR" ]; then
+              echo "No uploads folder found. Exiting."
+              exit 0
+          fi
+
+          # Check if uploads folder is empty
+          if [ -z "$(ls -A "$UPLOADS_DIR")" ]; then
+              echo "Uploads folder is empty. Exiting."
+              exit 0
+          fi
+
+          # Create target directory
           mkdir -p "$WORKING_DIR"
 
           # Ensure ledger.json exists
@@ -46,20 +55,20 @@ jobs:
               echo "{}" > ledger.json
           fi
 
-          # Iterate through all files in the uploads directory
+          # Process each file
           for FILE in "$UPLOADS_DIR"/*; do
               if [ -f "$FILE" ]; then
-                  # Determine new file name
                   ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
                   ((ITEM_NUMBER++))
                   FILE_EXTENSION="${FILE##*.}"
                   NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
 
-                  # Move the file to the correct directory
+                  echo "Processing file: $FILE -> $WORKING_DIR/$NEW_FILENAME"
+
+                  # Move the file
                   mv "$FILE" "$WORKING_DIR/$NEW_FILENAME"
 
                   # Update ledger.json
-                  DESCRIPTION="${{ github.event.inputs.description }}"
                   UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
                       if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
                       .[$date].files += [$file] |
@@ -67,17 +76,15 @@ jobs:
                   ' ledger.json)
 
                   echo "$UPDATED_JSON" > ledger.json
-
-                  echo "Processed $FILE -> $WORKING_DIR/$NEW_FILENAME"
+              else
+                  echo "No valid files found in uploads folder."
               fi
           done
 
-      # Step 4: Commit changes
-      - name: Commit and push changes
+      - name: Commit and Push Changes
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
-          git commit -m "Processed uploads and updated ledger.json"
-          git push
-
+          git commit -m "Processed uploads and updated ledger.json" || echo "Nothing to commit."
+          git push || echo "Push failed."
