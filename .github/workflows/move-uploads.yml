@@ -35,6 +35,10 @@ jobs:
           echo "YEAR: $YEAR, MONTH: $MONTH, DAY: $DAY"
           echo "Description: $DESCRIPTION"
 
+          # Debugging: Check uploads directory
+          echo "Uploads directory contents before processing:"
+          ls -la "$UPLOADS_DIR" || echo "Uploads directory does not exist."
+
           # Check if uploads folder exists
           if [ ! -d "$UPLOADS_DIR" ]; then
               echo "No uploads folder found. Exiting."
@@ -49,42 +53,62 @@ jobs:
 
           # Create target directory
           mkdir -p "$WORKING_DIR"
+          echo "Target working directory: $WORKING_DIR"
+          ls -la "$WORKING_DIR"
 
           # Ensure ledger.json exists
           if [ ! -f "ledger.json" ]; then
               echo "{}" > ledger.json
           fi
 
+          # Debugging: Check ledger.json before processing
+          echo "ledger.json contents before processing:"
+          cat ledger.json || echo "ledger.json does not exist or is empty."
+
+          # Validate ledger.json
+          if ! jq empty ledger.json >/dev/null 2>&1; then
+              echo "ledger.json is malformed. Exiting."
+              exit 1
+          fi
+
           # Process each file
           for FILE in "$UPLOADS_DIR"/*; do
-              if [ -f "$FILE" ]; then
-                  ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
-                  ((ITEM_NUMBER++))
-                  FILE_EXTENSION="${FILE##*.}"
-                  NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
-
-                  echo "Processing file: $FILE -> $WORKING_DIR/$NEW_FILENAME"
-
-                  # Move the file
-                  mv "$FILE" "$WORKING_DIR/$NEW_FILENAME"
-
-                  # Update ledger.json
-                  UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
-                      if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
-                      .[$date].files += [$file] |
-                      .[$date].text = .[$date].text // $text
-                  ' ledger.json)
-
-                  echo "$UPDATED_JSON" > ledger.json
-              else
-                  echo "No valid files found in uploads folder."
+              echo "Processing file: $FILE"
+              if [ ! -f "$FILE" ]; then
+                  echo "$FILE is not a valid file. Skipping."
+                  continue
               fi
+
+              ITEM_NUMBER=$(ls -1q "$WORKING_DIR" | wc -l)
+              ((ITEM_NUMBER++))
+              FILE_EXTENSION="${FILE##*.}"
+              NEW_FILENAME="$ITEM_NUMBER.$FILE_EXTENSION"
+
+              echo "Moving file to: $WORKING_DIR/$NEW_FILENAME"
+              mv "$FILE" "$WORKING_DIR/$NEW_FILENAME"
+
+              UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$NEW_FILENAME" --arg text "$DESCRIPTION" '
+                  if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
+                  .[$date].files += [$file] |
+                  .[$date].text = .[$date].text // $text
+              ' ledger.json)
+
+              echo "$UPDATED_JSON" > ledger.json
+              echo "File $FILE processed and added to ledger."
           done
+
+          # Debugging: Check ledger.json after processing
+          echo "ledger.json contents after processing:"
+          cat ledger.json
 
       - name: Commit and Push Changes
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
-          git commit -m "Processed uploads and updated ledger.json" || echo "Nothing to commit."
-          git push || echo "Push failed."
+          if ! git diff --cached --quiet; then
+              git commit -m "Processed uploads and updated ledger.json"
+              git push || echo "Push failed. Check permissions."
+          else
+              echo "No changes to commit."
+          fi
