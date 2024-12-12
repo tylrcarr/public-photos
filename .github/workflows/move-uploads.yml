@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       description:
-        description: "Photo description"
+        description: "Description for the uploaded photos"
         required: true
-      iso_date:
-        description: "ISO8601 date (optional, e.g., 2024-12-11)"
+      date:
+        description: "Date for the files (optional, ISO8601 format, e.g., 2024-12-11)"
         required: false
       thumbnail_file:
-        description: "File name for thumbnail generation (optional)"
+        description: "File name to use for thumbnail generation (optional)"
         required: false
 
 jobs:
@@ -32,20 +32,19 @@ jobs:
         run: |
           set -e
 
-          # Current date fallback
-          CURRENT_DATE=$(date +%Y-%m-%d)
-          ISO_DATE="${{ github.event.inputs.iso_date || CURRENT_DATE }}"
+          # Inputs
+          DATE_INPUT="${{ github.event.inputs.date || $(date +%Y-%m-%d) }}"
           THUMBNAIL_FILE="${{ github.event.inputs.thumbnail_file || '' }}"
           DESCRIPTION="${{ github.event.inputs.description }}"
           UPLOADS_DIR="uploads"
 
-          # Validate ISO date and extract year/month/day
-          if date -d "$ISO_DATE" >/dev/null 2>&1; then
-              YEAR=$(date -d "$ISO_DATE" +%Y)
-              MONTH=$(date -d "$ISO_DATE" +%m)
-              DAY=$(date -d "$ISO_DATE" +%d)
+          # Validate and extract year/month/day from the date input
+          if date -d "$DATE_INPUT" >/dev/null 2>&1; then
+              YEAR=$(date -d "$DATE_INPUT" +%Y)
+              MONTH=$(date -d "$DATE_INPUT" +%m)
+              DAY=$(date -d "$DATE_INPUT" +%d)
           else
-              echo "Invalid ISO date provided: $ISO_DATE. Falling back to current date."
+              echo "Invalid date provided: $DATE_INPUT. Falling back to the current date."
               YEAR=$(date +%Y)
               MONTH=$(date +%m)
               DAY=$(date +%d)
@@ -61,7 +60,7 @@ jobs:
               exit 0
           fi
 
-          # Create target directory
+          # Create the target directory
           mkdir -p "$WORKING_DIR"
 
           # Ensure ledger.json exists and is valid
