@@ -6,6 +6,12 @@ on:
       description:
         description: "Photo description"
         required: true
+      iso_date:
+        description: "ISO8601 date (optional, e.g., 2024-12-11)"
+        required: false
+      thumbnail_file:
+        description: "File name for thumbnail generation (optional)"
+        required: false
 
 jobs:
   process_photos:
@@ -15,112 +21,94 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install jq and file utilities
+      - name: Install required tools
         run: |
           sudo apt-get update
           sudo apt-get install jq -y
           sudo apt-get install file -y
+          sudo apt-get install imagemagick -y
 
-      - name: Process uploads
+      - name: Process uploads and generate thumbnail
         run: |
           set -e
 
-          # Current date as fallback
-          CURRENT_YEAR=$(date +%Y)
-          CURRENT_MONTH=$(date +%m)
-          CURRENT_DAY=$(date +%d)
-
-          YEAR=$CURRENT_YEAR
-          MONTH=$CURRENT_MONTH
-          DAY=$CURRENT_DAY
+          # Current date fallback
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          ISO_DATE="${{ github.event.inputs.iso_date || CURRENT_DATE }}"
+          THUMBNAIL_FILE="${{ github.event.inputs.thumbnail_file || '' }}"
           DESCRIPTION="${{ github.event.inputs.description }}"
           UPLOADS_DIR="uploads"
-          WORKING_DIR="$YEAR/$MONTH/$DAY"
 
-          echo "YEAR: $YEAR, MONTH: $MONTH, DAY: $DAY"
-          echo "Description: $DESCRIPTION"
-
-          # Debugging: Check uploads directory
-          echo "Uploads directory contents before processing:"
-          ls -la "$UPLOADS_DIR" || echo "Uploads directory does not exist."
-
-          # Check if uploads folder exists
-          if [ ! -d "$UPLOADS_DIR" ]; then
-              echo "No uploads folder found. Exiting."
-              exit 0
+          # Validate ISO date and extract year/month/day
+          if date -d "$ISO_DATE" >/dev/null 2>&1; then
+              YEAR=$(date -d "$ISO_DATE" +%Y)
+              MONTH=$(date -d "$ISO_DATE" +%m)
+              DAY=$(date -d "$ISO_DATE" +%d)
+          else
+              echo "Invalid ISO date provided: $ISO_DATE. Falling back to current date."
+              YEAR=$(date +%Y)
+              MONTH=$(date +%m)
+              DAY=$(date +%d)
           fi
 
-          # Check if uploads folder is empty
-          if [ -z "$(ls -A "$UPLOADS_DIR")" ]; then
-              echo "Uploads folder is empty. Exiting."
+          WORKING_DIR="$YEAR/$MONTH/$DAY"
+          echo "Processing files for date: $YEAR-$MONTH-$DAY"
+          echo "Description: $DESCRIPTION"
+
+          # Check if uploads folder exists and is not empty
+          if [ ! -d "$UPLOADS_DIR" ] || [ -z "$(ls -A "$UPLOADS_DIR")" ]; then
+              echo "No files to process in uploads folder. Exiting."
               exit 0
           fi
 
           # Create target directory
-          echo "Creating target directory: $WORKING_DIR"
-          mkdir -p "$WORKING_DIR" || { echo "Failed to create $WORKING_DIR"; exit 1; }
+          mkdir -p "$WORKING_DIR"
 
-          # Confirm directory was created
-          echo "Directory contents after creation:"
-          ls -la "$WORKING_DIR" || { echo "Failed to access $WORKING_DIR"; exit 1; }
-
-          # Ensure ledger.json exists
+          # Ensure ledger.json exists and is valid
           if [ ! -f "ledger.json" ]; then
               echo "{}" > ledger.json
           fi
-
-          # Debugging: Check ledger.json before processing
-          echo "ledger.json contents before processing:"
-          cat ledger.json || echo "ledger.json does not exist or is empty."
-
-          # Validate ledger.json
           if ! jq empty ledger.json >/dev/null 2>&1; then
-              echo "ledger.json is malformed. Exiting."
+              echo "Invalid ledger.json. Exiting."
               exit 1
           fi
 
+          # Initialize variables for thumbnail
+          THUMBNAIL_IMAGE=""
+          THUMBNAIL_PATH="$WORKING_DIR/thumbnail.png"
+
           # Process each file
           for FILE in "$UPLOADS_DIR"/*; do
-              echo "Processing file: $FILE"
-
-              # Check if the file is valid
               if [ ! -f "$FILE" ]; then
-                  echo "$FILE is not a valid file. Skipping."
+                  echo "Skipping invalid file: $FILE"
                   continue
               fi
 
-              # Debugging: File properties
-              echo "File type for $FILE:"
-              file "$FILE" || echo "Failed to determine file type."
+              # Move the file
+              mv "$FILE" "$WORKING_DIR/"
 
-              echo "File size for $FILE:"
-              stat --printf="%s bytes\n" "$FILE" || echo "Failed to determine file size."
-
-              # Move the file without renaming
-              echo "Attempting to move $FILE to $WORKING_DIR"
-              mv "$FILE" "$WORKING_DIR/" || { 
-                  echo "Failed to move $FILE to $WORKING_DIR"; 
-                  ls -la "$WORKING_DIR"; 
-                  exit 1; 
-              }
-
-              echo "Successfully moved $FILE to $WORKING_DIR"
+              # Set thumbnail source file
+              if [ -z "$THUMBNAIL_IMAGE" ] && { [ -z "$THUMBNAIL_FILE" ] || [[ "$(basename "$FILE")" == "$THUMBNAIL_FILE" ]]; }; then
+                  THUMBNAIL_IMAGE="$WORKING_DIR/$(basename "$FILE")"
+              fi
 
               # Update ledger.json
-              echo "Updating ledger.json with file $(basename "$FILE")"
               UPDATED_JSON=$(jq --arg date "$WORKING_DIR" --arg file "$(basename "$FILE")" --arg text "$DESCRIPTION" '
                   if .[$date] == null then .[$date] = { files: [], text: $text } else . end |
                   .[$date].files += [$file] |
                   .[$date].text = .[$date].text // $text
-              ' ledger.json) || { echo "jq command failed"; exit 1; }
-
-              echo "$UPDATED_JSON" > ledger.json || { echo "Failed to write to ledger.json"; exit 1; }
-              echo "File $FILE processed successfully and added to ledger.json."
+              ' ledger.json)
+              echo "$UPDATED_JSON" > ledger.json
           done
 
-          # Debugging: Check ledger.json after processing
-          echo "ledger.json contents after processing:"
-          cat ledger.json
+          # Generate Thumbnail
+          if [ -n "$THUMBNAIL_IMAGE" ]; then
+              echo "Generating thumbnail for: $THUMBNAIL_IMAGE"
+              convert "$THUMBNAIL_IMAGE" -thumbnail 150x150^ -gravity center -extent 150x150 "$THUMBNAIL_PATH"
+              echo "Thumbnail created: $THUMBNAIL_PATH"
+          else
+              echo "No valid image found for thumbnail generation."
+          fi
 
       - name: Commit and Push Changes
         run: |
@@ -128,8 +116,9 @@ jobs:
           git config user.email "actions@github.com"
           git add .
           if ! git diff --cached --quiet; then
-              git commit -m "Processed uploads and updated ledger.json"
-              git push || echo "Push failed. Check permissions."
+              git commit -m "Processed uploads, generated thumbnail, and updated ledger.json"
+              git push
           else
               echo "No changes to commit."
           fi
+
