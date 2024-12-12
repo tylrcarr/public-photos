@@ -1,0 +1,85 @@
+name: Generate Thumbnail
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date for the thumbnail (ISO8601 format, e.g., 2024-12-11)"
+        required: true
+      file_name:
+        description: "Specific file to use for the thumbnail"
+        required: true
+
+jobs:
+  generate_thumbnail:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install jq -y
+          sudo apt-get install imagemagick -y
+
+      - name: Generate Thumbnail
+        run: |
+          set -e
+
+          # Inputs
+          DATE_INPUT="${{ github.event.inputs.date }}"
+          FILE_NAME="${{ github.event.inputs.file_name }}"
+
+          # Validate and extract year/month/day from the date input
+          if date -d "$DATE_INPUT" >/dev/null 2>&1; then
+              YEAR=$(date -d "$DATE_INPUT" +%Y)
+              MONTH=$(date -d "$DATE_INPUT" +%m)
+              DAY=$(date -d "$DATE_INPUT" +%d)
+          else
+              echo "Invalid date provided: $DATE_INPUT"
+              exit 1
+          fi
+
+          WORKING_DIR="$YEAR/$MONTH/$DAY"
+          THUMBNAIL_PATH="$WORKING_DIR/thumbnail.png"
+
+          echo "Processing thumbnail for date: $YEAR-$MONTH-$DAY"
+          echo "Target file: $FILE_NAME"
+
+          # Check if the target directory exists
+          if [ ! -d "$WORKING_DIR" ]; then
+              echo "Target directory does not exist: $WORKING_DIR"
+              exit 1
+          fi
+
+          # Check if the target file exists
+          if [ ! -f "$WORKING_DIR/$FILE_NAME" ]; then
+              echo "Specified file does not exist: $WORKING_DIR/$FILE_NAME"
+              exit 1
+          fi
+
+          # Delete existing thumbnail if it exists
+          if [ -f "$THUMBNAIL_PATH" ]; then
+              echo "Existing thumbnail found. Deleting: $THUMBNAIL_PATH"
+              rm "$THUMBNAIL_PATH"
+          fi
+
+          # Generate new thumbnail
+          echo "Generating new thumbnail for: $WORKING_DIR/$FILE_NAME"
+          convert "$WORKING_DIR/$FILE_NAME" -auto-orient -thumbnail 150x150^ -gravity center -extent 150x150 "$THUMBNAIL_PATH"
+          echo "Thumbnail created: $THUMBNAIL_PATH"
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          if ! git diff --cached --quiet; then
+              git commit -m "Updated thumbnail for ${{ github.event.inputs.date }}"
+              git push
+          else
+              echo "No changes to commit."
+          fi
+
