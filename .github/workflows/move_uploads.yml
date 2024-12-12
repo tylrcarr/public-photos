@@ -33,21 +33,21 @@ jobs:
           set -e
 
           # Inputs
-          DATE_INPUT="${{ github.event.inputs.date || $(date +%Y-%m-%d) }}"
-          THUMBNAIL_FILE="${{ github.event.inputs.thumbnail_file || '' }}"
           DESCRIPTION="${{ github.event.inputs.description }}"
+          DATE_INPUT="${{ github.event.inputs.date }}"
+          THUMBNAIL_FILE="${{ github.event.inputs.thumbnail_file || '' }}"
           UPLOADS_DIR="uploads"
 
-          # Validate and extract year/month/day from the date input
-          if date -d "$DATE_INPUT" >/dev/null 2>&1; then
-              YEAR=$(date -d "$DATE_INPUT" +%Y)
-              MONTH=$(date -d "$DATE_INPUT" +%m)
-              DAY=$(date -d "$DATE_INPUT" +%d)
-          else
-              echo "Invalid date provided: $DATE_INPUT. Falling back to the current date."
+          # Handle the date input and fallback to the current date if empty
+          if [ -z "$DATE_INPUT" ] || ! date -d "$DATE_INPUT" >/dev/null 2>&1; then
+              echo "Invalid or missing date provided: $DATE_INPUT. Falling back to the current date."
               YEAR=$(date +%Y)
               MONTH=$(date +%m)
               DAY=$(date +%d)
+          else
+              YEAR=$(date -d "$DATE_INPUT" +%Y)
+              MONTH=$(date -d "$DATE_INPUT" +%m)
+              DAY=$(date -d "$DATE_INPUT" +%d)
           fi
 
           WORKING_DIR="$YEAR/$MONTH/$DAY"
