@@ -68,7 +68,7 @@ jobs:
 
           # Generate new thumbnail
           echo "Generating new thumbnail for: $WORKING_DIR/$FILE_NAME"
-          convert "$WORKING_DIR/$FILE_NAME" -auto-orient -thumbnail 150x150^ -gravity center -extent 150x150 "$THUMBNAIL_PATH"
+          convert "$WORKING_DIR/$FILE_NAME" -thumbnail 150x150^ -gravity center -extent 150x150 "$THUMBNAIL_PATH"
           echo "Thumbnail created: $THUMBNAIL_PATH"
 
       - name: Commit and Push Changes
@@ -81,5 +81,4 @@ jobs:
               git push
           else
               echo "No changes to commit."
-          fi
 
