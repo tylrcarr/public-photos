@@ -1,11 +1,11 @@
-name: Process Dog Pictures
+name: Process Doc Pictures
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'uploadDogs/**' # Trigger only when files in uploadDogs change
+      - 'uploadDogs/**'
   workflow_dispatch: # Allow manual runs
 
 jobs:
@@ -22,46 +22,38 @@ jobs:
       - name: Move, Rename, and Generate Thumbnails
         run: |
           mkdir -p dogs
-          for file in $(git diff --name-only HEAD^ HEAD | grep '^uploadDogs/.*\.\(jpg\|jpeg\|png\)$'); do
+          for file in uploadDogs/*.{jpg,jpeg,png}; do
             if [ -f "$file" ]; then
               # Generate a timestamp-based filename
-              timestamp=$(date +%s%N | cut -b1-13) # High-resolution timestamp (milliseconds)
+              timestamp=$(date +%s%N | cut -b1-13) # Milliseconds timestamp
               extension="${file##*.}"
-              
-              # Rename and move the original file
-              new_file="dogs/${timestamp}.${extension}"
-              mv "$file" "$new_file"
-              
-              # Generate a thumbnail with the same aspect ratio (200px height or width)
-              convert "$new_file" -resize 200x200^ -gravity center -extent 200x200 \
+              new_filename="dogs/${timestamp}.${extension}"
+
+              # Move file to dogs folder
+              mv "$file" "$new_filename"
+
+              # Generate thumbnail
+              convert "$new_filename" -resize 200x200^ -gravity center -extent 200x200 \
                 "dogs/${timestamp}_thumb.${extension}"
 
-              echo "Processed: $file → $new_file"
+              echo "Processed $file → $new_filename and generated thumbnail."
             fi
           done
-
-      - name: Clean Up uploadDogs Folder
-        run: |
-          # Delete all files left in uploadDogs after processing
-          find uploadDogs -type f -name '*.{jpg,jpeg,png}' -delete || true
-          echo "Cleaned up uploadDogs folder."
 
       - name: Generate photos.json
         run: |
           echo "[" > dogs/photos.json
-          for file in dogs/*_thumb.{jpg,jpeg,png}; do
-            if [[ $file =~ _thumb\.(jpg|jpeg|png)$ ]]; then
-              original="${file/_thumb/}"
-              echo "  {\"thumbnail\": \"$file\", \"full\": \"$original\"}," >> dogs/photos.json
-            fi
+          for thumb in dogs/*_thumb.{jpg,jpeg,png}; do
+            full="${thumb/_thumb/}"
+            echo "  {\"thumbnail\": \"$thumb\", \"full\": \"$full\"}," >> dogs/photos.json
           done
           sed -i '$ s/,$//' dogs/photos.json # Remove trailing comma
           echo "]" >> dogs/photos.json
-          echo "Generated updated photos.json."
+          echo "Generated photos.json."
 
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed images, generated thumbnails, and updated photos.json"
+          commit_message: "Processed images: moved, renamed, generated thumbnails, and updated photos.json"
           branch: main
-          file_pattern: "dogs/*"
+          file_pattern: "dogs/**"
