@@ -38,5 +38,29 @@
     "full": "dogs/1734403990207.jpeg",
     "fullWidth": 5712,
     "fullHeight": 4284
+  },
+  {
+    "thumbnail": "dogs/1734404638390_thumb.jpeg",
+    "thumbnailWidth": 200,
+    "thumbnailHeight": 150,
+    "full": "dogs/1734404638390.jpeg",
+    "fullWidth": 4032,
+    "fullHeight": 3024
+  },
+  {
+    "thumbnail": "dogs/1734404638695_thumb.jpeg",
+    "thumbnailWidth": 200,
+    "thumbnailHeight": 150,
+    "full": "dogs/1734404638695.jpeg",
+    "fullWidth": 4032,
+    "fullHeight": 3024
+  },
+  {
+    "thumbnail": "dogs/1734404638995_thumb.jpeg",
+    "thumbnailWidth": 200,
+    "thumbnailHeight": 238,
+    "full": "dogs/1734404638995.jpeg",
+    "fullWidth": 4281,
+    "fullHeight": 5088
   }
 ]
