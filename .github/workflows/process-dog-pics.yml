@@ -21,6 +21,7 @@ jobs:
 
       - name: Move, Rename, and Generate Thumbnails
         run: |
+          mkdir -p dogs
           for file in uploadDogs/*.{jpg,jpeg,png}; do
             if [ -f "$file" ]; then
               filename=$(basename -- "$file")
@@ -30,18 +31,21 @@ jobs:
               # Generate a unique name with timestamp
               unique_name="${base}_$(date +%s)"
               
-              # Rename the original file
-              mv "$file" "uploadDogs/${unique_name}.${extension}"
+              # Move and rename the original file
+              mv "$file" "dogs/${unique_name}.${extension}"
               
-              # Generate thumbnail using ImageMagick
-              convert "uploadDogs/${unique_name}.${extension}" \
-                -resize 200x200 "uploadDogs/${unique_name}_thumb.${extension}"
+              # Generate thumbnail with constrained aspect ratio (200px width or height)
+              convert "dogs/${unique_name}.${extension}" \
+                -resize 200x200^ -gravity center -extent 200x200 "dogs/${unique_name}_thumb.${extension}"
+              
+              # Remove the original file from uploadDogs
+              rm -f "$file"
             fi
           done
 
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed new images in uploadDogs: renamed files and generated thumbnails"
+          commit_message: "Moved images to dogs folder, renamed, and generated thumbnails"
           branch: main
-          file_pattern: "uploadDogs/*"
+          file_pattern: "dogs/*"
