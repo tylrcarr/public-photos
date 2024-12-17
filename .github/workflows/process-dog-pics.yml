@@ -22,27 +22,34 @@ jobs:
       - name: Move, Rename, and Generate Thumbnails
         run: |
           mkdir -p dogs
-          for file in uploadDogs/*.{jpg,jpeg,png}; do
+          for file in $(git diff --name-only HEAD^ HEAD | grep '^uploadDogs/.*\.\(jpg\|jpeg\|png\)$'); do
             if [ -f "$file" ]; then
               # Generate a timestamp-based filename
-              timestamp=$(date +%s)
+              timestamp=$(date +%s%N | cut -b1-13) # High-resolution timestamp (milliseconds)
               extension="${file##*.}"
               
               # Rename and move the original file
-              mv "$file" "dogs/${timestamp}.${extension}"
+              new_file="dogs/${timestamp}.${extension}"
+              mv "$file" "$new_file"
               
-              # Generate a thumbnail with 200px base (maintain aspect ratio)
-              convert "dogs/${timestamp}.${extension}" \
-                -resize 200x200^ -gravity center -extent 200x200 "dogs/${timestamp}_thumb.${extension}"
-              
-              # Remove the original file from uploadDogs
-              rm -f "$file"
+              # Generate a thumbnail with the same aspect ratio (200px height or width)
+              convert "$new_file" -resize 200x200^ -gravity center -extent 200x200 \
+                "dogs/${timestamp}_thumb.${extension}"
+
+              echo "Processed: $file → $new_file"
             fi
           done
+
+      - name: Clean Up uploadDogs Folder
+        run: |
+          # Delete all files left in uploadDogs after processing
+          find uploadDogs -type f -name '*.{jpg,jpeg,png}' -delete || true
+          echo "Cleaned up uploadDogs folder."
+
       - name: Generate photos.json
         run: |
           echo "[" > dogs/photos.json
-          for file in dogs/*.{jpg,jpeg,png}; do
+          for file in dogs/*_thumb.{jpg,jpeg,png}; do
             if [[ $file =~ _thumb\.(jpg|jpeg|png)$ ]]; then
               original="${file/_thumb/}"
               echo "  {\"thumbnail\": \"$file\", \"full\": \"$original\"}," >> dogs/photos.json
@@ -50,10 +57,11 @@ jobs:
           done
           sed -i '$ s/,$//' dogs/photos.json # Remove trailing comma
           echo "]" >> dogs/photos.json
+          echo "Generated updated photos.json."
 
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed images: moved to dogs folder, renamed with timestamp, and generated thumbnails"
+          commit_message: "Processed images, generated thumbnails, and updated photos.json"
           branch: main
           file_pattern: "dogs/*"
