@@ -1,15 +1,15 @@
-name: Process New Uploaded Images
+name: Process Images in uploadDogs
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'uploads/**' # Trigger when files are added to uploads folder
-  workflow_dispatch: # Allows manual runs
+      - 'uploadDogs/**' # Trigger only when files in uploadDogs change
+  workflow_dispatch: # Allow manual runs
 
 jobs:
-  process-new-images:
+  process-uploadDogs:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,19 +25,19 @@ jobs:
       - name: Move, Rename, and Generate Thumbnails
         run: |
           mkdir -p uploadDogs
-          for file in uploads/*.{jpg,jpeg,png}; do
+          for file in uploadDogs/*.{jpg,jpeg,png}; do
             if [ -f "$file" ]; then
               filename=$(basename -- "$file")
               extension="${filename##*.}"
               base="${filename%.*}"
               
-              # Generate a unique name
+              # Generate a unique name with timestamp
               unique_name="${base}_$(date +%s)"
               
-              # Move and rename the original file
+              # Rename the original file
               mv "$file" "uploadDogs/${unique_name}.${extension}"
               
-              # Generate thumbnail using Sharp
+              # Generate a thumbnail with Sharp
               npx sharp "uploadDogs/${unique_name}.${extension}" \
                 --resize 200,200 \
                 --to-file "uploadDogs/${unique_name}_thumb.${extension}"
@@ -47,6 +47,6 @@ jobs:
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed uploaded images: moved, renamed, and generated thumbnails"
+          commit_message: "Processed changes in uploadDogs: renamed files and generated thumbnails"
           branch: main
           file_pattern: "uploadDogs/*"
