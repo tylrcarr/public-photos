@@ -28,32 +28,52 @@ jobs:
               timestamp=$(date +%s%N | cut -b1-13) # Milliseconds timestamp
               extension="${file##*.}"
               new_filename="dogs/${timestamp}.${extension}"
+              thumb_filename="dogs/${timestamp}_thumb.${extension}"
 
               # Move file to dogs folder
               mv "$file" "$new_filename"
 
-              # Generate thumbnail
-              convert "$new_filename" -resize 200x200^ -gravity center -extent 200x200 \
-                "dogs/${timestamp}_thumb.${extension}"
+              # Generate thumbnail with natural aspect ratio
+              convert "$new_filename" -resize "200x>" "$thumb_filename"
 
-              echo "Processed $file → $new_filename and generated thumbnail."
+              echo "Processed $file → $new_filename and generated thumbnail $thumb_filename."
             fi
           done
 
-      - name: Generate photos.json
+      - name: Generate photos.json with Dimensions
         run: |
           echo "[" > dogs/photos.json
           for thumb in dogs/*_thumb.{jpg,jpeg,png}; do
             full="${thumb/_thumb/}"
-            echo "  {\"thumbnail\": \"$thumb\", \"full\": \"$full\"}," >> dogs/photos.json
+            
+            # Get dimensions for full image
+            full_dims=$(identify -format "%w x %h" "$full")
+            full_width=$(echo $full_dims | cut -d' ' -f1)
+            full_height=$(echo $full_dims | cut -d' ' -f3)
+            
+            # Get dimensions for thumbnail
+            thumb_dims=$(identify -format "%w x %h" "$thumb")
+            thumb_width=$(echo $thumb_dims | cut -d' ' -f1)
+            thumb_height=$(echo $thumb_dims | cut -d' ' -f3)
+            
+            # Append to JSON
+            echo "  {" >> dogs/photos.json
+            echo "    \"thumbnail\": \"$thumb\"," >> dogs/photos.json
+            echo "    \"thumbnailWidth\": $thumb_width," >> dogs/photos.json
+            echo "    \"thumbnailHeight\": $thumb_height," >> dogs/photos.json
+            echo "    \"full\": \"$full\"," >> dogs/photos.json
+            echo "    \"fullWidth\": $full_width," >> dogs/photos.json
+            echo "    \"fullHeight\": $full_height" >> dogs/photos.json
+            echo "  }," >> dogs/photos.json
           done
           sed -i '$ s/,$//' dogs/photos.json # Remove trailing comma
           echo "]" >> dogs/photos.json
-          echo "Generated photos.json."
+          echo "Generated photos.json with dimensions."
 
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed uploaded images: moved, renamed, generated thumbnails, and updated photos.json"
+          commit_message: "Processed images: added dimensions to photos.json"
           branch: main
           file_pattern: "."
+
