@@ -1,4 +1,4 @@
-name: Process Images in uploadDogs
+name: Process Dog Pictures
 
 on:
   push:
@@ -24,19 +24,16 @@ jobs:
           mkdir -p dogs
           for file in uploadDogs/*.{jpg,jpeg,png}; do
             if [ -f "$file" ]; then
-              filename=$(basename -- "$file")
-              extension="${filename##*.}"
-              base="${filename%.*}"
+              # Generate a timestamp-based filename
+              timestamp=$(date +%s)
+              extension="${file##*.}"
               
-              # Generate a unique name with timestamp
-              unique_name="${base}_$(date +%s)"
+              # Rename and move the original file
+              mv "$file" "dogs/${timestamp}.${extension}"
               
-              # Move and rename the original file
-              mv "$file" "dogs/${unique_name}.${extension}"
-              
-              # Generate thumbnail with constrained aspect ratio (200px width or height)
-              convert "dogs/${unique_name}.${extension}" \
-                -resize 200x200^ -gravity center -extent 200x200 "dogs/${unique_name}_thumb.${extension}"
+              # Generate a thumbnail with 200px base (maintain aspect ratio)
+              convert "dogs/${timestamp}.${extension}" \
+                -resize 200x200^ -gravity center -extent 200x200 "dogs/${timestamp}_thumb.${extension}"
               
               # Remove the original file from uploadDogs
               rm -f "$file"
@@ -46,6 +43,6 @@ jobs:
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Moved images to dogs folder, renamed, and generated thumbnails"
+          commit_message: "Processed images: moved to dogs folder, renamed with timestamp, and generated thumbnails"
           branch: main
           file_pattern: "dogs/*"
