@@ -33,7 +33,7 @@ jobs:
               # Move file to dogs folder
               mv "$file" "$new_filename"
 
-              # Generate thumbnail with natural aspect ratio
+              # Generate thumbnail (preserve natural aspect ratio)
               convert "$new_filename" -resize "200x>" "$thumb_filename"
 
               echo "Processed $file → $new_filename and generated thumbnail $thumb_filename."
@@ -44,27 +44,27 @@ jobs:
         run: |
           echo "[" > dogs/photos.json
           for thumb in dogs/*_thumb.{jpg,jpeg,png}; do
-            full="${thumb/_thumb/}"
-            
-            # Get dimensions for full image
-            full_dims=$(identify -format "%w x %h" "$full")
-            full_width=$(echo $full_dims | cut -d' ' -f1)
-            full_height=$(echo $full_dims | cut -d' ' -f3)
-            
-            # Get dimensions for thumbnail
-            thumb_dims=$(identify -format "%w x %h" "$thumb")
-            thumb_width=$(echo $thumb_dims | cut -d' ' -f1)
-            thumb_height=$(echo $thumb_dims | cut -d' ' -f3)
-            
-            # Append to JSON
-            echo "  {" >> dogs/photos.json
-            echo "    \"thumbnail\": \"$thumb\"," >> dogs/photos.json
-            echo "    \"thumbnailWidth\": $thumb_width," >> dogs/photos.json
-            echo "    \"thumbnailHeight\": $thumb_height," >> dogs/photos.json
-            echo "    \"full\": \"$full\"," >> dogs/photos.json
-            echo "    \"fullWidth\": $full_width," >> dogs/photos.json
-            echo "    \"fullHeight\": $full_height" >> dogs/photos.json
-            echo "  }," >> dogs/photos.json
+              if [ -f "$thumb" ]; then
+                  full="${thumb/_thumb/}"
+
+                  # Get dimensions for full image
+                  full_width=$(identify -format "%w" "$full" 2>/dev/null || echo 0)
+                  full_height=$(identify -format "%h" "$full" 2>/dev/null || echo 0)
+
+                  # Get dimensions for thumbnail
+                  thumb_width=$(identify -format "%w" "$thumb" 2>/dev/null || echo 0)
+                  thumb_height=$(identify -format "%h" "$thumb" 2>/dev/null || echo 0)
+
+                  # Append to JSON
+                  echo "  {" >> dogs/photos.json
+                  echo "    \"thumbnail\": \"$thumb\"," >> dogs/photos.json
+                  echo "    \"thumbnailWidth\": $thumb_width," >> dogs/photos.json
+                  echo "    \"thumbnailHeight\": $thumb_height," >> dogs/photos.json
+                  echo "    \"full\": \"$full\"," >> dogs/photos.json
+                  echo "    \"fullWidth\": $full_width," >> dogs/photos.json
+                  echo "    \"fullHeight\": $full_height" >> dogs/photos.json
+                  echo "  }," >> dogs/photos.json
+              fi
           done
           sed -i '$ s/,$//' dogs/photos.json # Remove trailing comma
           echo "]" >> dogs/photos.json
