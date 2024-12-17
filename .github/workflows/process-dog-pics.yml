@@ -16,15 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Node.js and Sharp
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      - run: npm install sharp
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
 
       - name: Move, Rename, and Generate Thumbnails
         run: |
-          mkdir -p uploadDogs
           for file in uploadDogs/*.{jpg,jpeg,png}; do
             if [ -f "$file" ]; then
               filename=$(basename -- "$file")
@@ -37,16 +33,15 @@ jobs:
               # Rename the original file
               mv "$file" "uploadDogs/${unique_name}.${extension}"
               
-              # Generate a thumbnail with Sharp
-              npx sharp "uploadDogs/${unique_name}.${extension}" \
-                --resize 200,200 \
-                --to-file "uploadDogs/${unique_name}_thumb.${extension}"
+              # Generate thumbnail using ImageMagick
+              convert "uploadDogs/${unique_name}.${extension}" \
+                -resize 200x200 "uploadDogs/${unique_name}_thumb.${extension}"
             fi
           done
 
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed changes in uploadDogs: renamed files and generated thumbnails"
+          commit_message: "Processed new images in uploadDogs: renamed files and generated thumbnails"
           branch: main
           file_pattern: "uploadDogs/*"
