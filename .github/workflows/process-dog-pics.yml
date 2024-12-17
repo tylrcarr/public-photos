@@ -1,4 +1,4 @@
-name: Process Doc Pictures
+name: Process Uploaded Images
 
 on:
   push:
@@ -54,6 +54,6 @@ jobs:
       - name: Commit and Push Changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Processed images: moved, renamed, generated thumbnails, and updated photos.json"
+          commit_message: "Processed uploaded images: moved, renamed, generated thumbnails, and updated photos.json"
           branch: main
-          file_pattern: "dogs/**"
+          file_pattern: "."
