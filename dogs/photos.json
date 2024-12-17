@@ -1,5 +1,0 @@
-[
-  {"thumbnail": "dogs/*_thumb.jpg", "full": "dogs/*.jpg"},
-  {"thumbnail": "dogs/*_thumb.jpeg", "full": "dogs/*.jpeg"},
-  {"thumbnail": "dogs/*_thumb.png", "full": "dogs/*.png"}
-]
