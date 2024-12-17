@@ -1,6 +1,4 @@
 [
-  {"thumbnail": "dogs/*_thumb.jpg", "full": "dogs/*.jpg"},
   {"thumbnail": "dogs/1734401267337_thumb.jpeg", "full": "dogs/1734401267337.jpeg"},
-  {"thumbnail": "dogs/1734401267942_thumb.jpeg", "full": "dogs/1734401267942.jpeg"},
-  {"thumbnail": "dogs/*_thumb.png", "full": "dogs/*.png"}
+  {"thumbnail": "dogs/1734401267942_thumb.jpeg", "full": "dogs/1734401267942.jpeg"}
 ]
