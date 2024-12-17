@@ -1,0 +1,52 @@
+name: Process New Uploaded Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'uploads/**' # Trigger when files are added to uploads folder
+  workflow_dispatch: # Allows manual runs
+
+jobs:
+  process-new-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js and Sharp
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - run: npm install sharp
+
+      - name: Move, Rename, and Generate Thumbnails
+        run: |
+          mkdir -p uploadDogs
+          for file in uploads/*.{jpg,jpeg,png}; do
+            if [ -f "$file" ]; then
+              filename=$(basename -- "$file")
+              extension="${filename##*.}"
+              base="${filename%.*}"
+              
+              # Generate a unique name
+              unique_name="${base}_$(date +%s)"
+              
+              # Move and rename the original file
+              mv "$file" "uploadDogs/${unique_name}.${extension}"
+              
+              # Generate thumbnail using Sharp
+              npx sharp "uploadDogs/${unique_name}.${extension}" \
+                --resize 200,200 \
+                --to-file "uploadDogs/${unique_name}_thumb.${extension}"
+            fi
+          done
+
+      - name: Commit and Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Processed uploaded images: moved, renamed, and generated thumbnails"
+          branch: main
+          file_pattern: "uploadDogs/*"
