@@ -158,5 +158,13 @@
     "full": "dogs/1735942714450.jpeg",
     "fullWidth": 4032,
     "fullHeight": 3024
+  },
+  {
+    "thumbnail": "dogs/1739572602125_thumb.jpeg",
+    "thumbnailWidth": 200,
+    "thumbnailHeight": 150,
+    "full": "dogs/1739572602125.jpeg",
+    "fullWidth": 3088,
+    "fullHeight": 2316
   }
 ]
